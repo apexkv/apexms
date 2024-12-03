@@ -7,24 +7,29 @@ metadata:
 
 environments:
     flask-app:
-        FLASK_APP: app.py
-        FLASK_ENV: development
-        FLASK_DEBUG: true
-        FLASK_RUN_HOST: localhost
+        - FLASK_APP=app.py
+        - FLASK_ENV=development
+        - FLASK_DEBUG=true
+        - FLASK_RUN_HOST=localhost
 
     database:
-        MYSQL_ROOT_PASSWORD: root
-        MYSQL_DATABASE: apexms
-        MYSQL_USER: apexms
-        MYSQL_PASSWORD: apexms
+        - MYSQL_ROOT_PASSWORD=root
+        - MYSQL_DATABASE=apexms
+        - MYSQL_USER=apexms
+        - MYSQL_PASSWORD=apexms
 
     django-app:
-        DJANGO_SETTINGS_MODULE: apexms.settings
-        DJANGO_SECRET_KEY: 123
+        - DJANGO_SETTINGS_MODULE=apexms.settings
+        - DJANGO_SECRET_KEY=123
 
     redis:
-        REDIS_HOST: localhost
-        REDIS_PORT: 6379
+        - REDIS_HOST=localhost
+        - REDIS_PORT=6379
+
+    postgres-db:
+        - POSTGRES_USER=postgres
+        - POSTGRES_PASSWORD=postgres
+        - POSTGRES_DB=apexms
 
 services:
     flask-app:
@@ -34,14 +39,14 @@ services:
             - flask-app
             - database
         databases:
-            - mysql:
+            - mysql
         networks:
             - apexms-network
         cache:
             - redis
-        message-brokers:
+        messagebrokers:
             - rabbitmq
-        depend-on:
+        dependon:
             - database
             - redis
             - rabbitmq
@@ -59,7 +64,7 @@ services:
             - apexms-network
         cache:
             - redis
-        depend-on:
+        dependon:
             - postgres-db
             - redis
 
@@ -74,33 +79,31 @@ services:
             - REDIS_PORT=6379
         networks:
             - apexms-network
-        message-brokers:
+        messagebrokers:
             - rabbitmq
         cache:
             - redis
-        depend-on:
+        dependon:
             - redis
             - rabbitmq
 
 databases:
     postgres-db:
-        database:
-            type: postgres
-            image: postgres
-            ports:
-                - 5432:5432
+        type: postgresql
+        image: postgresql:latest
+        ports:
+            - 5432:5432
         environments:
-            - postgres-data
-        volumes:
-            - postgres-data
+            - postgres-db
+        # volumes:
+        #     - postgres-data
         networks:
             - apexms-network
 
     database:
-        database:
-            type: mysql
-            ports:
-                - 3306:3306
+        type: mysql
+        ports:
+            - 3306:3306
         networks:
             - apexms-network
         environments:
@@ -112,10 +115,8 @@ databases:
             - MYSQL_PASSWORD=apexms
         volumes:
             - mysql-data
-        init-scripts:
-            - ./sql:/docker-entrypoint-initdb.d
 
-message-brokers:
+messagebrokers:
     rabbitmq:
         type: rabbitmq
         image: rabbitmq
@@ -123,7 +124,7 @@ message-brokers:
             - 5672:5672
         networks:
             - apexms-network
-        environments:
+        environment:
             - RABBITMQ_DEFAULT_USER=guest
             - RABBITMQ_DEFAULT_PASS=guest
 
@@ -138,42 +139,38 @@ containers:
             - redis
 
 networks:
-    apexms-network:
+    - apexms-network
 
 volumes:
-    mysql-data:
-    postgres-data:
-
-docker:
-    enable: true
-    docker-compose: true
+    - mysql-data
+    # - postgres-data
 
 git:
     repositories:
         django-app:
-            remote-url: test.com/django-app.git
-            main-branch: main
-            init-branches:
+            remoteurl: test.com/django-app.git
+            mainbranch: main
+            initbranches:
                 - dev
                 - feature
 
         flask-app:
-            remote-url: test.com/flask-app.git
-            main-branch: main
-            init-branches:
+            remoteurl: test.com/flask-app.git
+            mainbranch: main
+            initbranches:
                 - dev
                 - feature
 
         fast-api:
-            remote-url: test.com/fast-api.git
-            main-branch: main
-            init-branches:
+            remoteurl: test.com/fast-api.git
+            mainbranch: main
+            initbranches:
                 - dev
                 - feature
 
     full-project:
-        remote-url: test.com/apexms.git
-        main-branch: main
-        init-branches:
+        remoteurl: test.com/apexms.git
+        mainbranch: main
+        initbranches:
             - dev
             - feature
