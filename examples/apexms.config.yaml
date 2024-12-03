@@ -46,12 +46,9 @@ services:
             - redis
         messagebrokers:
             - rabbitmq
-        dependon:
-            - database
-            - redis
-            - rabbitmq
 
     django-app:
+        name: djangoapp
         framework: django
         port: 8000
         environments:
@@ -63,9 +60,6 @@ services:
         networks:
             - apexms-network
         cache:
-            - redis
-        dependon:
-            - postgres-db
             - redis
 
     fast-api:
@@ -83,9 +77,6 @@ services:
             - rabbitmq
         cache:
             - redis
-        dependon:
-            - redis
-            - rabbitmq
 
 databases:
     postgres-db:

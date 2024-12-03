@@ -1,5 +1,9 @@
+from .generator import GenerateDockerCompose, GenerateService
 from typing import Dict, List, TypedDict, Union, Literal
 from pydantic import BaseModel
+import yaml
+import json
+import os
 
 
 def get_environments(envList: List[str]):
@@ -17,16 +21,12 @@ class MetadataType(TypedDict):
 
 
 class Metadata:
+    data: MetadataType = {}
     def __init__(self, metadata: MetadataType):        
         self.project = metadata['project']
         self.version = metadata.get('version', '1.0.0')
         self.description = metadata.get('description', None)
-
-    def __str__(self):
-        return f"Metadata(version={self.version}, project={self.project}, description='{self.description}')"
-    
-    def __repr__(self):
-        return f"Metadata(version={self.version}, project={self.project}, description='{self.description}')"
+        self.data.update(metadata)
 
 
 class Environments:
@@ -35,9 +35,6 @@ class Environments:
     def __init__(self, envs: Dict[str, List[str]]):
         self.environments.update(envs)
 
-    def __str__(self):
-        return f"Environments({self.environments})"
-    
     @classmethod
     def get(cls, name):
         envs = cls.environments.get(name, [])
@@ -60,12 +57,6 @@ class Networks:
         for network in networks:
             self.add(network)
 
-    def __str__(self):
-        return f"Networks({', '.join(self.networks)})"
-    
-    def __repr__(self):
-        return f"Networks({', '.join(self.networks)})"
-    
     @classmethod
     def add(cls, network: str):
         if network not in cls.networks_list:
@@ -78,12 +69,6 @@ class Volumes:
     def __init__(self, volumes: List[str]):
         self.volumes = volumes
         self.volumes_list.extend(volumes)
-
-    def __str__(self):
-        return f"Volumes({', '.join(self.volumes_list)})"
-    
-    def __repr__(self):
-        return f"Volumes({', '.join(self.volumes_list)})"
 
     @classmethod
     def add(cls, volume: str):
@@ -116,14 +101,8 @@ class Database:
         self.environments = get_environments(database.get('environments', []))
         self.environments.extend(database.get("environment", []))
         self.volumes = self.__get_default_volumes__(database.get('volumes', []))
-        self.networks = Networks(database.get('networks', []))
+        self.networks = Networks(database.get('networks', [])).networks
         self.database_list[name] = self
-
-    def __str__(self):
-        return f"Database(name={self.name}, type={self.type}, image={self.image}, ports={self.ports}, environments={self.environments}, volumes={self.volumes}, networks={self.networks})"
-    
-    def __repr__(self):
-        return f"Database(name={self.name}, type={self.type}, image={self.image}, ports={self.ports}, environments={self.environments}, volumes={self.volumes}, networks={self.networks})"
 
     def __get_default_volumes__(self, volumes: List[str]):
         if len(volumes) == 0:
@@ -147,6 +126,7 @@ class Database:
 class ServiseType(TypedDict):
     framework: Literal['django', 'flask', 'fastapi']
     port: int
+    name: str | None
     environments: List[str] | None
     environment: List[str] | None
     databases: List[str] | None
@@ -166,19 +146,23 @@ class Service:
         # environments key:value list
         self.environments = get_environments(service.get('environments', []))
         self.environments.extend(service.get("environment", []))
+        self.image = f"python:3.11.9"
+        entrypoints = {
+            'django': 'manage.py runserver',
+            'flask': 'app.py',
+            'fastapi': 'app.py',
+        }
+        self.entrypoint = entrypoints[self.framework]
 
-        self.databases = self.__databases__(service.get('databases', []))
-        self.networks = Networks(service.get('networks', None)).networks
+        self.networks = list(Networks(service.get('networks', None)).networks)
+        self.volumes = service.get('volumes', [])
+        self.databases = list(self.__databases__(service.get('databases', [])).keys())
         self.cache = service.get('cache', None)
         self.messagebrokers = service.get('messagebrokers', None)
         self.dependon = service.get('dependon', None)
         self.services_list[name] = self
 
-    def __str__(self):
-        return f"Service(name={self.name}, framework={self.framework}, port={self.port}, environments={self.environments}, databases={self.databases}, networks={self.networks}, cache={self.cache}, messagebrokers={self.messagebrokers}, dependon={self.dependon})"
-    
-    def __repr__(self):
-        return f"Service(name={self.name}, framework={self.framework}, port={self.port}, environments={self.environments}, databases={self.databases}, networks={self.networks}, cache={self.cache}, messagebrokers={self.messagebrokers}, dependon={self.dependon})"
+        self.requirements = self.__set_requirements__()
     
     def __databases__(self, databases: List[str]):
         db_list = {}
@@ -206,6 +190,7 @@ class Service:
                         "networks": [db_network]
                     })
                     db_list[db_name] = new_db
+                    self.networks.append(db_network)
                     
                 elif db == "postgresql":
                     Networks.add(db_network)
@@ -223,10 +208,74 @@ class Service:
                         "networks": [db_network]
                     })
                     db_list[db_name] = new_db
+                    self.networks.append(db_network)
         return db_list
+    
+    def __set_requirements__(self):
+        req = []
+        if self.framework == "django":
+            req = [
+                "asgiref==3.8.1",
+                "Django==5.1.3",
+                "sqlparse==0.5.2",
+            ]
+        elif self.framework == "flask":
+            req = [
+                "blinker==1.9.0",
+                "click==8.1.7",
+                "Flask==3.1.0",
+                "itsdangerous==2.2.0",
+                "Jinja2==3.1.4",
+                "MarkupSafe==3.0.2",
+                "Werkzeug==3.1.3",
+            ]
+        elif self.framework == "fastapi":
+            req = [
+                "annotated-types==0.7.0",
+                "anyio==4.6.2.post1",
+                "certifi==2024.8.30",
+                "click==8.1.7",
+                "dnspython==2.7.0",
+                "email_validator==2.2.0",
+                "fastapi==0.115.5",
+                "fastapi-cli==0.0.5",
+                "h11==0.14.0",
+                "httpcore==1.0.7",
+                "httptools==0.6.4",
+                "httpx==0.28.0",
+                "idna==3.10",
+                "Jinja2==3.1.4",
+                "markdown-it-py==3.0.0",
+                "MarkupSafe==3.0.2",
+                "mdurl==0.1.2",
+                "pydantic==2.10.2",
+                "pydantic_core==2.27.1",
+                "Pygments==2.18.0",
+                "python-dotenv==1.0.1",
+                "python-multipart==0.0.19",
+                "PyYAML==6.0.2",
+                "rich==13.9.4",
+                "shellingham==1.5.4",
+                "sniffio==1.3.1",
+                "starlette==0.41.3",
+                "typer==0.14.0",
+                "typing_extensions==4.12.2",
+                "uvicorn==0.32.1",
+                "uvloop==0.21.0",
+                "watchfiles==1.0.0",
+                "websockets==14.1",
+            ]
+        return req
 
     def get(self, name:str):
         return self.services_list.get(name, None)
+    
+    def generate(self, path: str):
+        path = os.path.join(path, self.name)
+        os.makedirs(path, exist_ok=True)
+    
+
+        
 
 
 class ConfigurationType(TypedDict):
@@ -239,6 +288,7 @@ class ConfigurationType(TypedDict):
 
 
 class Configuration:
+    data: 'Configuration' = None
     def __init__(self, config: ConfigurationType):        
         self.metadata = Metadata(config['metadata'])
         self.environments = Environments(config['environments'])
@@ -248,3 +298,9 @@ class Configuration:
         self.services = {name: Service(name, service) for name, service in config.get("services", {}).items()}
         self.data = self
 
+    def generate(self, path: str):
+        for service in self.services.values():
+            generator = GenerateService(service, path)
+            generator.generate()
+
+        GenerateDockerCompose(self, path)
