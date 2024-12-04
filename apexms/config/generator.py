@@ -1,144 +1,90 @@
 import os
-import sys
-import yaml
-
-class GenerateProject:
-    def __init__(self, service, path: str):
-        self.service = service
-        self.path = path
-        self.generate()
-    
-    def generate(self):
-        if self.service.framework == "django":
-            self.generate_django()
-        elif self.service.framework == "flask":
-            self.generate_flask()
-        elif self.service.framework == "fastapi":
-            self.generate_fastapi()
-
-    def generate_django(self):
-        # activate virtual environment and check operating system
-        if sys.platform == "win32":
-            os.system(f"{self.path}/venv/Scripts/activate")
-        else:
-            os.system(f"source {self.path}/venv/bin/activate")
-        # create project using django-admin
-        os.system(f"django-admin startproject {self.service.name} {self.path}")
-    
-    def generate_flask(self):
-        script = "from flask import Flask\n"
-        script += "\n"
-        script += "app = Flask(__name__)\n"
-        script += "\n"
-        script += "@app.route('/')\n"
-        script += "def hello_world():\n"
-        script += "\treturn 'Hello, World!'\n"
-        script += "\n"
-        script += "\n"
-        script += "if __name__ == '__main__':\n"
-        script += "\timport uvicorn\n"
-        script += f"\tuvicorn.run(app, host='0.0.0.0', port={self.service.port})\n"
-
-        with open(os.path.join(self.path, "app.py"), 'w') as f:
-            f.write(script)
-
-    def generate_fastapi(self):
-        script = "from fastapi import FastAPI\n"
-        script += "\n"
-        script += "app = FastAPI()\n"
-        script += "\n"
-        script += "@app.get('/')\n"
-        script += "def read_root():\n"
-        script += "\treturn {'Hello': 'World'}\n"
-
-        with open(os.path.join(self.path, "app.py"), 'w') as f:
-            f.write(script)
+from typing import Dict, List
+from .parsers import Configuration, Database, Service
 
 
-class GenerateService:
-    def __init__(self, service, path: str):
-        self.service = service
-        self.path = path
+
+class GitGenerator:
+    def __init__(self, config:Configuration, base_path:str):
+        self.config = config
+        self.base_path = base_path
 
     def generate(self):
-        service_path = os.path.join(self.path, self.service.name)
-        os.makedirs(service_path, exist_ok=True)
-        self.generate_dockerfile()
+        pass
+
+
+class ProjectGenerator:
+    def __init__(self, name:str, service:Service, base_path:str):
+        self.name = name
+        self.service = service
+        self.project_path = os.path.join(base_path, name)
+        os.makedirs(self.project_path, exist_ok=True)
+        print(f"Generating project {name} at {self.project_path}")
+
+    def generate(self):
         self.generate_env()
         self.generate_wait_for_it()
         self.generate_entrypoint()
-        self.generate_python_env()
-        os.system("deactivate")
-        GenerateProject(self.service, service_path)
-    
+        self.generate_dockerfile()
+
     def generate_dockerfile(self):
-        service_path = os.path.join(self.path, self.service.name)
-        with open(os.path.join(service_path, "Dockerfile"), 'w') as f:
-            f.write(f"FROM {self.service.image}\n")
-            f.write("ENV PYTHONUNBUFFERED 1\n")
-            f.write("WORKDIR /app\n")
-            f.write("COPY requirements.txt .\n")
-            f.write("RUN pip install --no-cache-dir -r requirements.txt\n")
-            f.write("COPY . /app/\n")
-            f.write(f"EXPOSE {self.service.port}\n")
+        with open(os.path.join(self.project_path, 'Dockerfile'), 'w') as f:
+            f.write("FROM python:3.11.9\n\n")
+            f.write("ENV PYTHONUNBUFFERED 1\n\n")
+            f.write("WORKDIR /app\n\n")
+            f.write("COPY requirements.txt .\n\n")
+            f.write("RUN pip install --no-cache-dir -r requirements.txt\n\n")
+            f.write("COPY . /app/\n\n")
+            f.write(f"EXPOSE {self.service.port}\n\n")
             f.write("RUN chmod +x /app/wait-for-it.sh\n")
-            f.write("RUN chmod +x /app/entrypoint.sh\n")
-            f.write(f'ENTRYPOINT ["/app/entrypoint.sh"]\n')
+            f.write("RUN chmod +x /app/entrypoint.sh\n\n")
+            f.write("ENTRYPOINT [\"/app/entrypoint.sh\"]\n")
 
     def generate_env(self):
-        service_path = os.path.join(self.path, self.service.name)
-        with open(os.path.join(service_path, ".env"), 'w') as f:
-            env_list = list(set(self.service.environments))
-            env_dict = {}
-            for env in env_list:
-                key, value = env.split("=")
-                prefix = key.split("_")[0]
-                if prefix not in env_dict:
-                    env_dict[prefix] = []
-                env_dict[prefix].append(env)
-            for key, values in env_dict.items():
-                f.write(f"# {key} environment variables\n")
-                for value in values:
-                    f.write(f"{value}\n")
-                f.write("\n")
+        """
+        group all env variables from service and databases
+        by preifix of the service name
+        """
+        env_vars:Dict[str, List[str]] = {}
+        for env in self.service.environments:
+            prefix = env.split('=')[0].split('_')[0]
+            if prefix not in env_vars:
+                env_vars[prefix] = [env]
+            else:
+                env_vars[prefix].append(env)
 
-    def generate_entrypoint(self):
-        with open(os.path.join(self.path, self.service.name, "entrypoint.sh"), 'w') as f:
-            f.write("#!/bin/bash\n")
-            f.write("\n")
-            
-            # if databases in service wait for them to start
-            if len(self.service.databases) > 0:
-                for db in self.service.databases:
-                    f.write(f"echo 'Waiting for {db} Database to start...'\n")
-                    f.write(f"./wait-for-it.sh {db}:5432 --strict -t 30\n")
-                    f.write("\n")
-            
-            # if service is django make migrations and migrate
-            if self.service.framework == "django":
-                f.write("echo 'Making Migrations...'\n")
-                f.write("python manage.py makemigrations\n")
-                f.write("\n")
-                f.write("echo 'Migrating the Database...'\n")
-                f.write("python manage.py migrate\n")
-                f.write("\n")
-            
-            # start the server
-            f.write(f"echo 'Starting the {self.service.name} server...'\n")
-            if self.service.framework == "django":
-                f.write(f"python manage.py runserver {self.service.port}")
+        with open(os.path.join(self.project_path, '.env'), 'w') as f:
+            for prefix, env_list in env_vars.items():
+                f.write(f"#{prefix.capitalize()} environment variables\n")
+                for env in env_list:
+                    f.write(env + '\n')
+                f.write('\n')
+ 
+    def generate_requirements(self):
+        pass
 
-            elif self.service.framework == "flask":
-                f.write(f"python app.py\n")
-            
-            elif self.service.framework == "fastapi":
-                f.write(f"python app.py\n")
+    def generate_venv(self):
+        pass
 
-            f.write("\n")
-            f.write("exec \"$@\"\n")
-    
+    def generate_project(self):
+        project_generators = {
+            'django': self.generate_django,
+            'flask': self.generate_flask,
+            'fastapi': self.generate_fastapi
+        }
+        project_generators[self.service.framework]()
+
+    def generate_django(self):
+        pass
+
+    def generate_flask(self):
+        pass
+
+    def generate_fastapi(self):
+        pass
+
     def generate_wait_for_it(self):
-        wait_for_it = """
+        entry_point = """
 #!/bin/bash
 # Use this script to test if a given TCP host/port are available
 
@@ -322,59 +268,97 @@ else
     exit $WAITFORIT_RESULT
 fi
 """
-        with open(os.path.join(self.path, self.service.name, "wait-for-it.sh"), 'w') as f:
-            f.write(wait_for_it)
+        with open(os.path.join(self.project_path, 'wait-for-it.sh'), 'w') as f:
+            f.write(entry_point)
 
-    def generate_requirements(self):
-        with open(os.path.join(self.path, self.service.name, "requirements.txt"), 'w') as f:
-            for req in self.service.requirements:
-                f.write(f"{req}\n")
+    def generate_entrypoint(self):
+        """
+        #!/bin/bash
 
-    def install_requirements(self):
-        os.system(f"pip install --no-cache-dir -r {self.path}/{self.service.name}/requirements.txt")
+        echo "Waiting for RabbitMQ to start..."
+        ./wait-for-it.sh rabbitmq:5672 --strict -t 30
 
-    def generate_python_env(self):
-        service_path = os.path.join(self.path, self.service.name)
-        # genarate python virtual environment
-        os.system(f"python -m venv {service_path}/venv")
-        # activate the virtual environment
-        os.system(f"source {service_path}/venv/bin/activate")
-        # install the requirements
-        self.install_requirements()
-        # generate the requirements.txt
-        self.generate_requirements()
-        # deactivate the virtual environment
+        echo "Waiting for Redis Server to start..."
+        ./wait-for-it.sh redis:6379 --strict -t 30
+
+        echo "Waiting for Postgres Post-Write Database to start..."
+        ./wait-for-it.sh posts-write-db:5432 --strict -t 30
+
+        echo "Making Migrations..."
+        python manage.py makemigrations
+
+        echo "Migrating the Database..."
+        python manage.py migrate
+
+        echo "Starting the server..."
+        python manage.py runserver 0.0.0.0:8000 &
+
+        echo "Starting RabbitMQ Consumer..."
+        python consumers.py &
+
+        echo "Starting Celery..."
+        celery -A postwrite worker --loglevel=info &
+
+        echo "Starting Celery Beat..."
+        celery -A postwrite beat --loglevel=info
+
+        exec "$@"
+        """
+        with open(os.path.join(self.project_path, 'entrypoint.sh'), 'w') as f:
+            f.write("#!/bin/bash\n\n")
+
+            for db_name, db in self.service.database_list.items():
+                f.write(f"echo \"Waiting for {db_name} to start...\"\n")
+                for port in db.ports:
+                    f.write(f"./wait-for-it.sh {db_name}:{port.split(':')[-1]} --strict -t 30\n")
+            f.write("\n")
+            if self.service.framework == 'django':
+                f.write("echo \"Making Migrations...\"\n")
+                f.write("python manage.py makemigrations\n\n")
+                f.write("echo \"Migrating the Database...\"\n")
+                f.write("python manage.py migrate\n\n")
+                f.write("echo \"Starting the server...\"\n")
+                f.write(f"python manage.py runserver 0.0.0.0:{self.service.port}")
+
+            elif self.service.framework == 'flask':
+                f.write("echo \"Starting the server...\"\n")
+                f.write(f"python app.py")
+
+            elif self.service.framework == 'fastapi':
+                f.write("echo \"Starting the server...\"\n")
+                f.write(f"fastapi run dev")
+
+            f.write("\n\nexec \"$@\"\n")
+            
 
 
-class GenerateDockerCompose:
-    def __init__(self, config, path: str):
-        self.config = config
-        self.path = path
-        self.generate()
+class ServiceGenerator:
+    def __init__(self, services:Dict[str, Service], base_path:str):
+        self.services = services
+        self.base_path = base_path
 
     def generate(self):
+        for name, service in self.services.items():
+            project_generator = ProjectGenerator(name, service, self.base_path)
+            project_generator.generate()
 
-        docker_compose = {
-            "services": {},
-            "networks": {net:{} for net in list(self.config.networks.networks_list)},
-            "volumes": {vol:{} for vol in list(self.config.volumes.volumes_list)}
-        }
 
-        for service in self.config.services.values():
-            service_dict = {
-                "build": {
-                    "context": f"./{service.name}",
-                    "dockerfile": "Dockerfile"
-                },
-                "ports": [f"{service.port}:{service.port}"],
-                "env_file": [f"{service.name}/.env"],
-                "networks": service.networks
-            }
-            if  len(service.volumes) > 0:
-                service_dict['volumes'] = service.volumes
-            docker_compose['services'][service.name] = service_dict
-        
-        with open(os.path.join(self.path, "docker-compose.yaml"), 'w') as f:
-            gen_data = yaml.dump(docker_compose, default_flow_style=False, sort_keys=False, indent=4)
-            gen_data = gen_data.replace("{}", "")
-            f.write(gen_data)
+class DatabaseGenerator:
+    def __init__(self, databases:Dict[str, Database], base_path:str):
+        self.databases = databases
+        self.base_path = base_path
+
+    def generate(self):
+        pass
+
+
+class Generator:
+    def __init__(self, config:Configuration, base_path:str):
+        project_name = os.path.join(base_path, config.metadata.project)
+        os.makedirs(project_name, exist_ok=True)
+        self.service_generator = ServiceGenerator(config.services, project_name)
+        self.git_generator = GitGenerator(config, project_name)
+
+    def generate(self):
+        self.service_generator.generate()
+        self.git_generator.generate()
