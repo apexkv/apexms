@@ -159,7 +159,7 @@ git:
                 - dev
                 - feature
 
-    full-project:
+    fullproject:
         remoteurl: test.com/apexms.git
         mainbranch: main
         initbranches:
