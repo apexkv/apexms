@@ -5,7 +5,7 @@ from .tool import tool, click
 from apexms.handlers.project.init import init as init_handler
 
 
-@tool.command(name="init")
+@tool.command(name="init", help="Initialize a new project")
 @click.argument("project_name", required=True)
 @click.option("--name", "-n", help="Name of the project")
 @click.option("--description", "-d", help="Description of the project")

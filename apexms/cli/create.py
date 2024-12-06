@@ -1,7 +1,7 @@
 from .tool import tool, click
 
 
-@tool.command()
+@tool.command(name="create", help="Create a new microservices")
 def create():
     click.echo("Project created")
 
