@@ -3,7 +3,7 @@ import os
 import yaml
 
 
-def init(project_name, name, description, path="."):
+def init(project_name, name, description, path, echo):
     config_path = os.path.join(os.getcwd(), "apexms.config.yaml")
     
     if not name:
@@ -11,13 +11,15 @@ def init(project_name, name, description, path="."):
 
     # name must only have letters, numbers, underscores and hyphens
     if not re.match(r"^[a-zA-Z0-9_-]*$", name):
-        return ["\nProject name must only have [a-zA-Z0-9_-]\n"]
+        echo("\nProject name must only have [a-zA-Z0-9_-]\n")
+        return
 
     # abs path to the project
-    abs_path = os.path.abspath(str(path))
+    abs_path = os.path.abspath(path)
+    project_path = os.path.join(abs_path, name)
 
-    if not os.path.exists(abs_path):
-        os.makedirs(abs_path)
+    if not os.path.exists(project_path):
+        os.makedirs(project_path)
 
     if path:
         config_path = os.path.join(abs_path, "apexms.config.yaml")
@@ -28,7 +30,8 @@ def init(project_name, name, description, path="."):
 
     # Check if project already initialized
     if os.path.exists(config_path):
-        return ["\nProject already initialized\n"]
+        echo("\nProject already initialized\n")
+        return
     
     # Create config file
     config = {
@@ -36,6 +39,7 @@ def init(project_name, name, description, path="."):
             "project": name,
             "version": "1.0.0",
             "description": description,
+            "path": project_path,
         },
         "environments":{},
         "services":{},
@@ -43,6 +47,7 @@ def init(project_name, name, description, path="."):
         "networks":["private-network", "public-network"],
         "volumes":{},
         "git":{
+            "repositories": {},
             "fullproject":{
                 "remoteurl": "",
                 "mainbranch": "main",
@@ -64,7 +69,6 @@ def init(project_name, name, description, path="."):
         f.write(f"# ApexMS Configuration for project: {name}\n")
         f.write(config_yaml)
 
-    return [
-        f"\nProject initialized: {name}",
-        f"Config Path: {config_path}\n",
-    ]
+
+    echo(f"\nProject initialized: {name}")
+    echo(f"Config Path: {config_path}\n")
