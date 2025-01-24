@@ -10,6 +10,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app/
 
+RUN python manage.py makemigrations
+
+RUN python manage.py migrate
+
 EXPOSE 14186
 
 CMD ["python", "manage.py", "runserver"]
