@@ -1,24 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
-import apiClient from "./api/client";
 
 function App() {
     const [count, setCount] = useState(0);
-    async function testApi() {
-        await apiClient
-            .get("/test/")
-            .then((res) => {
-                console.log(res.data);
-            })
-            .catch((err) => {
-                console.log(err);
-            });
-    }
-    useEffect(() => {
-        testApi();
-    }, []);
+
     return (
         <>
             <div>

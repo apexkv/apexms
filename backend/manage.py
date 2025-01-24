@@ -6,6 +6,7 @@ from django.core.management.commands.runserver import Command as runserver
 
 
 runserver.default_port = "14186" # changed default port to 14186
+runserver.default_addr = "0.0.0.0" # changed default address to 0.0.0.0
 
 def main():
     """Run administrative tasks."""

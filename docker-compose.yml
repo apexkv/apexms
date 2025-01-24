@@ -1,0 +1,25 @@
+name: apexms
+
+services:
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        restart: always
+        ports:
+            - 4186:4186
+        depends_on:
+            - backend
+        volumes:
+            - ./frontend:/app
+            - /app/node_modules
+
+    backend:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        restart: always
+        ports:
+            - 14186:14186
+        volumes:
+            - ./backend:/app
