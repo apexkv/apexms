@@ -107,7 +107,15 @@ volumes:
     - products-volume
     - admin-volume
 git:
-    repositories: null
+    repositories:
+        api1:
+            remoteurl: ""
+            mainbranch: main
+            initbranches:
+                - develop
+                - feature
+                - bugfix
+                - hotfix
     fullproject:
         remoteurl: ""
         mainbranch: main
