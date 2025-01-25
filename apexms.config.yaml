@@ -1,0 +1,126 @@
+# ApexMS Configuration for project: apexkv
+metadata:
+    version: 1.0.0
+    project: apexkv
+    description: "Project: apexkv created with ApexMS"
+    path: /Users/kavi/all-projects/apexms/apexkv
+environments:
+    users-env:
+        - POSTGRES_DB=usersdb
+        - POSTGRES_USER=users-user
+        - POSTGRES_PASSWORD=ibjCXRCw1sUp
+        - POSTGRES_HOST=users
+        - POSTGRES_ROOT_PASSWORD=S0vI4EFaUank
+        - POSTGRES_PORT=5432
+    products-env:
+        - MYSQL_DATABASE=productsdb
+        - MYSQL_USER=products-user
+        - MYSQL_PASSWORD=8rtqkQuq
+        - MYSQL_ROOT_PASSWORD=TkUSHptv
+        - MYSQL_PORT=3306
+    admin-env:
+        - POSTGRES_DB=admindb
+        - POSTGRES_USER=admin-user
+        - POSTGRES_PASSWORD=GvgD8W8H9M3O
+        - POSTGRES_HOST=admin
+        - POSTGRES_ROOT_PASSWORD=Lnaa6NMcxGLY
+        - POSTGRES_PORT=5432
+services:
+    api1:
+        name: api1
+        framework: django
+        port: 8000
+        databases:
+            - users
+        networks:
+            - public-network
+            - private-network
+        environments:
+            - users-env
+        environment:
+    api2:
+        name: api2
+        framework: flask
+        port: 6000
+        databases:
+            - products
+        networks:
+            - public-network
+            - private-network
+        environments:
+            - products-env
+        environment:
+    api3:
+        name: api3
+        framework: fastapi
+        port: 7000
+        databases:
+        networks:
+            - public-network
+        environments:
+        environment:
+databases:
+    users:
+        name: users
+        type: postgresql
+        image: postgres:17
+        ports:
+            - 5432:5432
+        volumes:
+            - users-volume:/var/lib/postgresql/data
+        networks:
+            - private-network
+        environments:
+            - users-env
+        environment:
+    products:
+        name: products
+        type: mysql
+        image: mysql:8.4
+        ports:
+            - 3306:3306
+        volumes:
+            - products-volume:/var/lib/mysql
+        networks:
+            - private-network
+        environments:
+            - products-env
+        environment:
+    admin:
+        name: admin
+        type: postgresql
+        image: postgres:17
+        ports:
+            - 5432:5432
+        volumes:
+            - admin-volume:/var/lib/postgresql/data
+        networks:
+            - private-network
+        environments:
+            - admin-env
+        environment:
+networks:
+    - private-network
+    - public-network
+volumes:
+    - users-volume
+    - products-volume
+    - admin-volume
+git:
+    repositories:
+        api1:
+            remoteurl: ""
+            mainbranch: main
+            initbranches:
+                - develop
+                - feature
+                - bugfix
+                - hotfix
+    fullproject:
+        remoteurl: ""
+        mainbranch: main
+        initbranches:
+            - develop
+            - feature
+            - bugfix
+            - hotfix
